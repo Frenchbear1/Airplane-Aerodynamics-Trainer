@@ -731,8 +731,15 @@
               <line x1="0" y1="0" x2="260" y2="0" stroke="#58677a" stroke-width="2"></line>
               <line x1="12" y1="-8" x2="12" y2="8" stroke="#58677a" stroke-width="2"></line>
               <line x1="248" y1="-8" x2="248" y2="8" stroke="#58677a" stroke-width="2"></line>
-              <text x="0" y="29" class="svg-small">0% MAC leading edge</text>
-              <text x="260" y="29" text-anchor="end" class="svg-small">100% MAC trailing edge</text>
+              <text x="12" y="29" class="svg-small" text-anchor="middle">
+                <tspan x="12" dy="0">0% MAC</tspan>
+                <tspan x="12" dy="15">leading edge</tspan>
+              </text>
+
+              <text x="248" y="29" class="svg-small" text-anchor="middle">
+                <tspan x="248" dy="0">100% MAC</tspan>
+                <tspan x="248" dy="15">trailing edge</tspan>
+              </text>
               <line id="cgTick" x1="0" y1="-18" x2="0" y2="18" stroke="#323846" stroke-width="4"></line>
               <line id="cpTick" x1="0" y1="-18" x2="0" y2="18" stroke="#1769aa" stroke-width="4"></line>
               <text id="rulerCg" x="0" y="-25" class="svg-small" text-anchor="middle">CG</text>
