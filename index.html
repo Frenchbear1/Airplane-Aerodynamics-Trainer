@@ -1,0 +1,1689 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PA-28 / C172 Aerodynamics Trainer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #5d6a7e;
+      --line: #cbd6e2;
+      --panel: #ffffff;
+      --field: #f5f8fb;
+      --sky: #dcedf7;
+      --ground: #c5d3bb;
+      --blue: #1769aa;
+      --cyan: #1399b2;
+      --green: #2f855a;
+      --amber: #b7791f;
+      --red: #c53030;
+      --violet: #6554c0;
+      --shadow: 0 14px 35px rgba(24, 39, 75, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: #edf3f8;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 14px 18px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .mark {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      color: white;
+      background: linear-gradient(135deg, var(--blue), var(--cyan));
+      font-weight: 800;
+      letter-spacing: 0;
+      box-shadow: 0 8px 20px rgba(23, 105, 170, 0.22);
+      flex: 0 0 auto;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.05rem, 1.8vw, 1.45rem);
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .status-chip {
+      min-width: 152px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(47, 133, 90, 0.28);
+      color: #19543a;
+      background: #eaf7f0;
+      text-align: center;
+      font-size: 0.88rem;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .status-chip.caution {
+      color: #7a4a10;
+      background: #fff7e8;
+      border-color: rgba(183, 121, 31, 0.32);
+    }
+
+    .status-chip.stall {
+      color: #8d1f1f;
+      background: #fff0f0;
+      border-color: rgba(197, 48, 48, 0.32);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(560px, 1fr) minmax(300px, 340px);
+      gap: 12px;
+      padding: 12px;
+      min-height: 0;
+    }
+
+    .sim-area,
+    .controls {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .sim-area {
+      display: grid;
+      grid-template-rows: minmax(390px, 1fr);
+      min-height: 560px;
+    }
+
+    .scene-wrap {
+      position: relative;
+      min-height: 390px;
+      background: var(--sky);
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 390px;
+      touch-action: none;
+    }
+
+    .metrics {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 4;
+      display: grid;
+      grid-template-columns: minmax(132px, 0.8fr) minmax(235px, 1.2fr);
+      gap: 8px;
+      width: min(560px, calc(100% - 24px));
+      background: transparent;
+      pointer-events: none;
+    }
+
+    .metric {
+      min-width: 0;
+      padding: 9px 10px;
+      border: 1px solid rgba(203, 214, 226, 0.55);
+      border-radius: 8px;
+      background: rgba(251, 253, 255, 0.48);
+      box-shadow: 0 8px 22px rgba(24, 39, 75, 0.08);
+      backdrop-filter: blur(6px);
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+    }
+
+    .metric .value {
+      margin-top: 4px;
+      font-size: 1.1rem;
+      line-height: 1.15;
+      font-weight: 850;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .metric .sub {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-rows: auto auto auto auto;
+      align-content: start;
+      min-height: 0;
+    }
+
+    .controls-head,
+    .controls-foot {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfdff;
+    }
+
+    .controls-foot {
+      border-top: 1px solid var(--line);
+      border-bottom: 0;
+    }
+
+    .controls-head h2 {
+      margin: 0;
+      font-size: 1rem;
+      letter-spacing: 0;
+    }
+
+    .controls-head p,
+    .controls-foot p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.25;
+    }
+
+    .control-scroll {
+      overflow: visible;
+      padding: 10px 12px;
+    }
+
+    .stability-dashboard {
+      display: grid;
+      gap: 8px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #f7fafc;
+    }
+
+    .stability-action-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.8fr) minmax(132px, 1fr);
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .stability-box {
+      padding: 9px 10px;
+      border: 1px solid #d6e1ec;
+      border-left: 4px solid #58677a;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .stability-box.positive {
+      border-left-color: var(--green);
+      background: #f2fbf6;
+    }
+
+    .stability-box.neutral {
+      border-left-color: var(--amber);
+      background: #fff9ed;
+    }
+
+    .stability-box.negative {
+      border-left-color: var(--red);
+      background: #fff4f4;
+    }
+
+    .stability-label {
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 850;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .stability-title {
+      margin-top: 2px;
+      font-size: 0.88rem;
+      line-height: 1.15;
+      font-weight: 850;
+    }
+
+    .stability-text {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 0.74rem;
+      line-height: 1.25;
+    }
+
+    .disturbance-panel {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+      align-items: center;
+      min-width: 0;
+      padding: 8px;
+      border: 1px solid #d6e1ec;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .disturbance-panel .stability-label {
+      text-align: center;
+    }
+
+    .demo-duration {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr) 24px;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .demo-duration .duration-value {
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 850;
+      letter-spacing: 0.04em;
+      text-align: center;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .disturbance-panel button {
+      min-height: 28px;
+      padding: 0 5px;
+      font-size: 0.72rem;
+      border-color: #bfd1e2;
+      white-space: nowrap;
+    }
+
+    .disturbance-panel .duration-step {
+      min-height: 22px;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .disturbance-panel button.running {
+      color: #ffffff;
+      background: var(--blue);
+      border-color: var(--blue);
+    }
+
+    .disturbance-progress {
+      grid-column: 1 / -1;
+      height: 5px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e4edf5;
+    }
+
+    .disturbance-progress span {
+      display: block;
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--blue);
+      transition: width 0.12s linear;
+    }
+
+    .disturbance-status {
+      grid-column: 1 / -1;
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 800;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .control-group {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: 10px;
+      row-gap: 7px;
+      padding: 8px 0;
+      border-bottom: 1px solid #e6edf4;
+    }
+
+    .control-group:first-child {
+      padding-top: 0;
+    }
+
+    .control-group:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .control-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      grid-column: 1 / -1;
+      margin-bottom: 6px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .row {
+      display: grid;
+      gap: 4px;
+      margin: 0;
+      min-width: 0;
+    }
+
+    .row.full-row {
+      grid-column: 1 / -1;
+    }
+
+    .row:first-of-type {
+      margin-top: 0;
+    }
+
+    .row:last-child {
+      margin-bottom: 0;
+    }
+
+    label.control-label {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: baseline;
+      gap: 5px;
+      font-size: 0.76rem;
+      font-weight: 760;
+    }
+
+    output {
+      color: var(--blue);
+      font-variant-numeric: tabular-nums;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--blue);
+      height: 18px;
+    }
+
+    input[type="range"]:disabled {
+      opacity: 0.45;
+    }
+
+    .hint {
+      display: none;
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.32;
+    }
+
+    .switch-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      grid-column: 1 / -1;
+      margin: 0;
+      color: var(--ink);
+      font-size: 0.76rem;
+      font-weight: 760;
+    }
+
+    .switch-line input {
+      width: 34px;
+      height: 19px;
+      accent-color: var(--blue);
+    }
+
+    button {
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--ink);
+      font: inherit;
+      font-weight: 850;
+      cursor: pointer;
+    }
+
+    button.primary {
+      color: white;
+      border-color: var(--blue);
+      background: var(--blue);
+    }
+
+    button:focus-visible,
+    input:focus-visible {
+      outline: 3px solid rgba(19, 153, 178, 0.25);
+      outline-offset: 2px;
+    }
+
+    .scene-actions {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      z-index: 4;
+      display: grid;
+      grid-template-columns: auto auto;
+      gap: 8px;
+    }
+
+    .scene-actions button {
+      min-width: 92px;
+      min-height: 32px;
+      padding: 0 10px;
+    }
+
+    .fine-print {
+      font-size: 0.76rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .svg-label {
+      font: 800 15px Inter, system-ui, sans-serif;
+      fill: var(--ink);
+      paint-order: stroke;
+      stroke: rgba(255,255,255,0.88);
+      stroke-width: 4px;
+      stroke-linejoin: round;
+    }
+
+    .svg-small {
+      font: 760 12px Inter, system-ui, sans-serif;
+      fill: var(--muted);
+      paint-order: stroke;
+      stroke: rgba(255,255,255,0.92);
+      stroke-width: 3px;
+      stroke-linejoin: round;
+    }
+
+    .plane-skin {
+      fill: rgba(249, 251, 255, 0.62);
+      stroke: #27364d;
+      stroke-width: 2;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .plane-detail {
+      fill: none;
+      stroke: #27364d;
+      stroke-width: 1.7;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .window {
+      fill: #bfe5f5;
+      stroke: #27364d;
+      stroke-width: 1.3;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .vector-line {
+      fill: none;
+      stroke-linecap: round;
+      stroke-width: 5;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .thin-line {
+      stroke-width: 2;
+      vector-effect: non-scaling-stroke;
+    }
+
+    @media (max-width: 980px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .controls,
+      .sim-area {
+        min-height: auto;
+      }
+    }
+
+    @media (max-width: 680px) {
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .status-chip {
+        width: 100%;
+      }
+
+      main {
+        padding: 10px;
+      }
+
+      .metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .stability-action-row {
+        grid-template-columns: 1fr;
+      }
+
+      .disturbance-panel {
+        grid-template-columns: 1fr 1fr 1fr;
+        align-items: center;
+      }
+
+      .demo-duration,
+      .disturbance-progress,
+      .disturbance-status {
+        grid-column: 1 / -1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="title">
+        <div class="mark" aria-hidden="true">A</div>
+        <div>
+          <h1>Airplane Aerodynamics Trainer</h1>
+        </div>
+      </div>
+      <div id="statusChip" class="status-chip">Normal flight</div>
+    </header>
+
+    <main>
+      <section class="sim-area" aria-label="Aerodynamics visualization">
+        <div class="scene-wrap">
+          <svg id="scene" viewBox="0 -120 1000 880" role="img" aria-labelledby="svgTitle svgDesc">
+            <title id="svgTitle">Interactive airplane aerodynamics diagram</title>
+            <desc id="svgDesc">A side-view airplane with movable center of gravity, center of pressure, lift, weight, and tail downforce vectors.</desc>
+            <defs>
+              <linearGradient id="skyGradient" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="#dff1fb"></stop>
+                <stop offset="62%" stop-color="#eef7fc"></stop>
+                <stop offset="62.2%" stop-color="#d4dec9"></stop>
+                <stop offset="100%" stop-color="#bdcdae"></stop>
+              </linearGradient>
+              <marker id="arrowBlue" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+                <path d="M1,1 L11,6 L1,11 Z" fill="#1769aa"></path>
+              </marker>
+              <marker id="arrowRed" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+                <path d="M1,1 L11,6 L1,11 Z" fill="#c53030"></path>
+              </marker>
+              <marker id="arrowViolet" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+                <path d="M1,1 L11,6 L1,11 Z" fill="#6554c0"></path>
+              </marker>
+              <marker id="arrowDark" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+                <path d="M1,1 L11,6 L1,11 Z" fill="#323846"></path>
+              </marker>
+            </defs>
+
+            <rect x="0" y="-120" width="1000" height="880" fill="url(#skyGradient)"></rect>
+
+            <g id="attitudeGrid">
+              <line x1="0" y1="398" x2="1000" y2="398" stroke="#7d986e" stroke-width="2" opacity="0.65"></line>
+              <g opacity="0.38" stroke="#8fb4c5" stroke-width="1">
+                <line x1="0" y1="80" x2="1000" y2="80"></line>
+                <line x1="0" y1="160" x2="1000" y2="160"></line>
+                <line x1="0" y1="240" x2="1000" y2="240"></line>
+                <line x1="0" y1="320" x2="1000" y2="320"></line>
+                <line x1="0" y1="480" x2="1000" y2="480"></line>
+                <line x1="0" y1="560" x2="1000" y2="560"></line>
+              </g>
+              <g id="flowLines" stroke="#4b9eba" stroke-width="2" opacity="0.58" marker-end="url(#arrowBlue)">
+                <line x1="70" y1="250" x2="270" y2="250"></line>
+                <line x1="70" y1="310" x2="270" y2="310"></line>
+                <line x1="70" y1="370" x2="270" y2="370"></line>
+              </g>
+              <text x="142" y="232" class="svg-small" text-anchor="middle">relative wind</text>
+            </g>
+
+            <g id="plane" transform="rotate(0 500 318)">
+              <image href="assets/pa28-outline-clean.png" x="105" y="160" width="790" height="294" preserveAspectRatio="xMidYMid meet"></image>
+
+              <g id="wingGroup">
+                <path id="wingPath" d="" fill="#d9ecff" stroke="#0f4c81" stroke-width="2.5" vector-effect="non-scaling-stroke"></path>
+                <path id="camberLine" d="" fill="none" stroke="#0f4c81" stroke-width="1.8" stroke-dasharray="7 7" vector-effect="non-scaling-stroke"></path>
+                <line id="chordLine" x1="315" y1="376" x2="540" y2="376" stroke="#75869b" stroke-width="1.6" stroke-dasharray="5 5" vector-effect="non-scaling-stroke"></line>
+                <path id="cpTrack" d="" fill="none" stroke="#1769aa" stroke-width="3" opacity="0.25" vector-effect="non-scaling-stroke"></path>
+              </g>
+            </g>
+
+            <g id="vectors">
+              <line id="liftVector" class="vector-line" stroke="#1769aa" x1="0" y1="0" x2="0" y2="0"></line>
+              <line id="tailVector" class="vector-line" stroke="#6554c0" x1="0" y1="0" x2="0" y2="0"></line>
+              <line id="weightVector" class="vector-line" stroke="#323846" x1="0" y1="0" x2="0" y2="0"></line>
+              <polygon id="liftArrowHead" points="" fill="#1769aa"></polygon>
+              <polygon id="tailArrowHead" points="" fill="#6554c0"></polygon>
+              <polygon id="weightArrowHead" points="" fill="#323846"></polygon>
+            </g>
+
+            <g id="markers">
+              <circle id="cgDot" cx="0" cy="0" r="13" fill="#fff" stroke="#323846" stroke-width="4"></circle>
+              <line id="cgCross1" x1="0" y1="0" x2="0" y2="0" stroke="#323846" stroke-width="2.5"></line>
+              <line id="cgCross2" x1="0" y1="0" x2="0" y2="0" stroke="#323846" stroke-width="2.5"></line>
+              <text id="cgLabel" x="0" y="0" class="svg-label">CG</text>
+
+              <circle id="cpDot" cx="0" cy="0" r="12" fill="#e7f4ff" stroke="#1769aa" stroke-width="4"></circle>
+              <text id="cpLabel" x="0" y="0" class="svg-label">CP</text>
+
+              <text id="liftLabel" x="0" y="0" class="svg-label">Lift</text>
+              <text id="buffetLabel" x="0" y="0" class="svg-small" opacity="0">* buffeting</text>
+              <text id="tailLabel" x="0" y="0" class="svg-label">Tail downforce</text>
+              <text id="tailLimitLabel" x="0" y="0" class="svg-small" opacity="0">* tail limit / drag</text>
+              <text id="weightLabel" x="0" y="0" class="svg-label">Weight</text>
+            </g>
+
+            <g id="macRuler" transform="translate(300 575)">
+              <line x1="0" y1="0" x2="260" y2="0" stroke="#58677a" stroke-width="2"></line>
+              <line x1="12" y1="-8" x2="12" y2="8" stroke="#58677a" stroke-width="2"></line>
+              <line x1="248" y1="-8" x2="248" y2="8" stroke="#58677a" stroke-width="2"></line>
+              <text x="0" y="29" class="svg-small">0% MAC leading edge</text>
+              <text x="260" y="29" text-anchor="end" class="svg-small">100% MAC trailing edge</text>
+              <line id="cgTick" x1="0" y1="-18" x2="0" y2="18" stroke="#323846" stroke-width="4"></line>
+              <line id="cpTick" x1="0" y1="-18" x2="0" y2="18" stroke="#1769aa" stroke-width="4"></line>
+              <text id="rulerCg" x="0" y="-25" class="svg-small" text-anchor="middle">CG</text>
+              <text id="rulerCp" x="0" y="-40" class="svg-small" text-anchor="middle">CP</text>
+            </g>
+          </svg>
+
+          <div class="metrics" aria-live="polite">
+            <div class="metric">
+              <div class="label">Attitude</div>
+              <div id="attitudeMetric" class="value">0 deg</div>
+            </div>
+            <div class="metric">
+              <div class="label">Weight / Lifting Force</div>
+              <div id="balanceMetric" class="value">2,400 / 0 lb</div>
+              <div id="cpTravelMetric" class="sub">Lift = 0.00x weight</div>
+            </div>
+          </div>
+
+          <div class="scene-actions">
+            <button id="resetBtn" type="button">Reset</button>
+            <button id="stallBtn" class="primary" type="button">Show Stall</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="controls" aria-label="Simulation controls">
+        <div class="controls-head">
+          <h2>Controls</h2>
+        </div>
+
+        <div class="stability-dashboard" aria-live="polite">
+          <div id="cgStabilityBox" class="stability-box positive">
+            <div class="stability-label">CG Effects</div>
+            <div id="cgStabilityTitle" class="stability-title">Mid CG</div>
+            <p id="cgStabilityText" class="stability-text">Balanced elevator feel and stall recovery.</p>
+          </div>
+          <div class="stability-action-row">
+            <div id="longitudinalStabilityBox" class="stability-box positive">
+              <div class="stability-label">Longitudinal Stability</div>
+              <div id="longitudinalStabilityTitle" class="stability-title">Positive Static / Positive Dynamic</div>
+              <p id="longitudinalStabilityText" class="stability-text">CP is behind CG. Pitch swings get smaller.</p>
+            </div>
+            <div class="disturbance-panel" aria-label="Pitch disturbance playback">
+              <div class="demo-duration" aria-label="Demo duration">
+                <button id="demoDurationMinus" class="duration-step" type="button" aria-label="Shorter demonstration">-</button>
+                <output id="demoDurationOut" class="duration-value">10 sec</output>
+                <button id="demoDurationPlus" class="duration-step" type="button" aria-label="Longer demonstration">+</button>
+              </div>
+              <button id="pitchUpDemoBtn" type="button">Pitch Up</button>
+              <button id="pitchDownDemoBtn" type="button">Pitch Down</button>
+              <div class="disturbance-progress" aria-hidden="true"><span id="disturbanceProgress"></span></div>
+              <output id="disturbanceOut" class="disturbance-status">Ready</output>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-scroll">
+          <div class="control-group">
+            <div class="control-title">Attitude and air</div>
+            <div class="row">
+              <label class="control-label" for="pitch">Pitch attitude <output id="pitchOut">6 deg</output></label>
+              <input id="pitch" type="range" min="-90" max="90" step="0.1" value="6">
+            </div>
+            <div class="row">
+              <label class="control-label" for="airspeed">Airspeed <output id="speedOut">88 kt</output></label>
+              <input id="airspeed" type="range" min="45" max="135" step="1" value="88">
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="control-title">Balance</div>
+            <div class="row">
+              <label class="control-label" for="cg">Center of gravity <output id="cgOut">30% MAC</output></label>
+              <input id="cg" type="range" min="18" max="40" step="0.5" value="30">
+            </div>
+            <div class="row">
+              <label class="control-label" for="cp">Center of pressure <output id="cpOut">42% MAC</output></label>
+              <input id="cp" type="range" min="15" max="74" step="0.5" value="42">
+            </div>
+            <label class="switch-line">
+              <span>Auto CP from pitch and stall</span>
+              <input id="autoCp" type="checkbox" checked>
+            </label>
+            <div class="hint">At increasing angle of attack, CP moves forward until stall. After stall, separation drives CP aft and the lift vector weakens.</div>
+          </div>
+
+          <div class="control-group">
+            <div class="control-title">Wing and tail</div>
+            <div class="row">
+              <label class="control-label" for="camber">Wing camber <output id="camberOut">4.0%</output></label>
+              <input id="camber" type="range" min="0" max="8" step="0.1" value="4">
+            </div>
+            <div class="row">
+              <label class="control-label" for="tail">Tail downforce <output id="tailOut">420 lb</output></label>
+              <input id="tail" type="range" min="0" max="900" step="10" value="420">
+            </div>
+            <div class="hint">More forward CG usually needs more tail downforce, so the wing must carry more total load.</div>
+          </div>
+
+        </div>
+
+        <div class="controls-foot">
+          <p class="fine-print">Educational approximation only. It exaggerates CP travel and stall effects so the pitch couple is easy to see.</p>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    const els = {
+      plane: document.getElementById("plane"),
+      wingPath: document.getElementById("wingPath"),
+      camberLine: document.getElementById("camberLine"),
+      cpTrack: document.getElementById("cpTrack"),
+      pitch: document.getElementById("pitch"),
+      airspeed: document.getElementById("airspeed"),
+      cg: document.getElementById("cg"),
+      cp: document.getElementById("cp"),
+      autoCp: document.getElementById("autoCp"),
+      camber: document.getElementById("camber"),
+      tail: document.getElementById("tail"),
+      resetBtn: document.getElementById("resetBtn"),
+      stallBtn: document.getElementById("stallBtn"),
+      demoDurationMinus: document.getElementById("demoDurationMinus"),
+      demoDurationPlus: document.getElementById("demoDurationPlus"),
+      demoDurationOut: document.getElementById("demoDurationOut"),
+      pitchUpDemoBtn: document.getElementById("pitchUpDemoBtn"),
+      pitchDownDemoBtn: document.getElementById("pitchDownDemoBtn"),
+      disturbanceProgress: document.getElementById("disturbanceProgress"),
+      disturbanceOut: document.getElementById("disturbanceOut"),
+      pitchOut: document.getElementById("pitchOut"),
+      speedOut: document.getElementById("speedOut"),
+      cgOut: document.getElementById("cgOut"),
+      cpOut: document.getElementById("cpOut"),
+      camberOut: document.getElementById("camberOut"),
+      tailOut: document.getElementById("tailOut"),
+      statusChip: document.getElementById("statusChip"),
+      cgStabilityBox: document.getElementById("cgStabilityBox"),
+      cgStabilityTitle: document.getElementById("cgStabilityTitle"),
+      cgStabilityText: document.getElementById("cgStabilityText"),
+      longitudinalStabilityBox: document.getElementById("longitudinalStabilityBox"),
+      longitudinalStabilityTitle: document.getElementById("longitudinalStabilityTitle"),
+      longitudinalStabilityText: document.getElementById("longitudinalStabilityText"),
+      liftVector: document.getElementById("liftVector"),
+      tailVector: document.getElementById("tailVector"),
+      weightVector: document.getElementById("weightVector"),
+      liftArrowHead: document.getElementById("liftArrowHead"),
+      tailArrowHead: document.getElementById("tailArrowHead"),
+      weightArrowHead: document.getElementById("weightArrowHead"),
+      cgDot: document.getElementById("cgDot"),
+      cgCross1: document.getElementById("cgCross1"),
+      cgCross2: document.getElementById("cgCross2"),
+      cpDot: document.getElementById("cpDot"),
+      cgLabel: document.getElementById("cgLabel"),
+      cpLabel: document.getElementById("cpLabel"),
+      liftLabel: document.getElementById("liftLabel"),
+      buffetLabel: document.getElementById("buffetLabel"),
+      tailLabel: document.getElementById("tailLabel"),
+      tailLimitLabel: document.getElementById("tailLimitLabel"),
+      weightLabel: document.getElementById("weightLabel"),
+      attitudeMetric: document.getElementById("attitudeMetric"),
+      balanceMetric: document.getElementById("balanceMetric"),
+      cpTravelMetric: document.getElementById("cpTravelMetric"),
+      cgTick: document.getElementById("cgTick"),
+      cpTick: document.getElementById("cpTick"),
+      rulerCg: document.getElementById("rulerCg"),
+      rulerCp: document.getElementById("rulerCp")
+    };
+
+    const model = {
+      center: { x: 500, y: 318 },
+      wingLE: 315,
+      wingTE: 540,
+      wingY: 376,
+      chord: 225,
+      tail: { x: 814, y: 288 },
+      weightLb: 2400,
+      stallAoA: 16,
+      pitchRate: 0,
+      lastTailForPitch: 420,
+      lastPitchForTail: 6,
+      lastCgForTrim: 30,
+      demoDurationMs: 10000,
+      disturbance: null,
+      transition: null,
+      lastTime: performance.now()
+    };
+
+    const tailPerPitchDegree = 26;
+    const stabilator = {
+      downLimitDeg: -2,
+      upLimitDeg: 14,
+      miniStallDeg: 13
+    };
+
+    const defaults = {
+      pitch: 6,
+      airspeed: 88,
+      cg: 30,
+      cp: 42,
+      camber: 4,
+      tail: 420
+    };
+
+    const fmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
+    }
+
+    function smoothstep(edge0, edge1, value) {
+      const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+      return t * t * (3 - 2 * t);
+    }
+
+    function pctToX(percentMac) {
+      return model.wingLE + (percentMac / 100) * model.chord;
+    }
+
+    function rotatePoint(point, pitchDeg) {
+      const angle = pitchDeg * Math.PI / 180;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const dx = point.x - model.center.x;
+      const dy = point.y - model.center.y;
+      return {
+        x: model.center.x + dx * cos - dy * sin,
+        y: model.center.y + dx * sin + dy * cos
+      };
+    }
+
+    function camberAt(t, camberPct) {
+      const camberPx = (camberPct / 100) * model.chord;
+      return model.wingY - camberPx * Math.sin(Math.PI * t);
+    }
+
+    function airfoilPaths(camberPct) {
+      const upper = [];
+      const lower = [];
+      const camber = [];
+      for (let i = 0; i <= 48; i += 1) {
+        const t = i / 48;
+        const x = model.wingLE + t * model.chord;
+        const yCamber = camberAt(t, camberPct);
+        const thicknessRatio = 0.12;
+        const thickness = model.chord * thicknessRatio * 5 * (
+          0.2969 * Math.sqrt(Math.max(t, 0.0001)) -
+          0.1260 * t -
+          0.3516 * t * t +
+          0.2843 * t * t * t -
+          0.1015 * t * t * t * t
+        );
+        upper.push([x, yCamber - thickness]);
+        lower.push([x, yCamber + thickness]);
+        camber.push([x, yCamber]);
+      }
+
+      const upperD = upper.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+      const lowerD = lower.slice().reverse().map(p => `L ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+      const camberD = camber.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+      return {
+        wing: `${upperD} ${lowerD} Z`,
+        camber: camberD,
+        track: camber.slice(8, 36).map((p, i) => `${i === 0 ? "M" : "L"} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ")
+      };
+    }
+
+    function tailAerodynamics(tailLb, pitchDeg) {
+      const command = clamp(tailLb / 900, 0, 1);
+      const deflectionDeg = lerp(stabilator.downLimitDeg, stabilator.upLimitDeg, command);
+      const pitchLoad = pitchDeg >= 0 ? pitchDeg * 0.36 : pitchDeg * 0.12;
+      const tailAoa = deflectionDeg + pitchLoad;
+      const stallT = clamp((tailAoa - stabilator.miniStallDeg) / 11, 0, 1);
+      const liftEfficiency = 1 - stallT * 0.58;
+      const downforce = tailLb * liftEfficiency;
+      const dragEquivalent = tailLb * (0.08 + Math.abs(deflectionDeg) / 130 + stallT * 0.46);
+      return { deflectionDeg, tailAoa, stallT, downforce, dragEquivalent };
+    }
+
+    function effectiveStallAoA(cgPct, cpPct, tailLb) {
+      const cpAftOfCg = cpPct - cgPct;
+      const closeFactor = clamp((8 - cpAftOfCg) / 12, 0, 1);
+      const forwardFactor = clamp((cgPct - cpPct) / 10, 0, 1);
+      const tailFactor = clamp((tailLb - defaults.tail) / 480, 0, 1);
+      const penalty = closeFactor * 3.0 + forwardFactor * 2.0 + closeFactor * tailFactor * 1.6;
+      return clamp(model.stallAoA - penalty, 10.5, model.stallAoA);
+    }
+
+    function attachedCenterOfPressure(aoa, camberPct, stall = model.stallAoA) {
+      const normalT = clamp((aoa + 4) / (stall + 4), 0, 1);
+      const lowAoACp = 48 - camberPct * 0.75;
+      const highAoACp = 25 - camberPct * 0.25;
+      return clamp(lerp(lowAoACp, highAoACp, normalT), 15, 74);
+    }
+
+    function autoCenterOfPressure(aoa, camberPct, timeSec, stall = model.stallAoA) {
+      let cp = attachedCenterOfPressure(aoa, camberPct, stall);
+      if (aoa > stall) {
+        const stallT = clamp((aoa - stall) / 9, 0, 1);
+        const buffet = Math.sin(timeSec * 9.5) * 1.5 + Math.sin(timeSec * 15.7) * 0.8;
+        cp = lerp(cp, 68, stallT) + buffet * stallT;
+      }
+      return clamp(cp, 15, 74);
+    }
+
+    function postStallLiftRatio(stallExcess) {
+      const earlyExcess = Math.min(stallExcess, 6);
+      const earlyDrop = 0.93 - earlyExcess * 0.055;
+      const deepDrop = 0.04 + 0.56 * Math.exp(-Math.max(0, stallExcess - 6) / 24);
+      return clamp(stallExcess <= 6 ? earlyDrop : deepDrop, 0.04, 0.93);
+    }
+
+    function liftCoefficient(aoa, camberPct, stall = model.stallAoA) {
+      const normalCl = 0.24 + 0.073 * aoa + 0.026 * camberPct;
+      const stallCl = 1.42 + 0.022 * camberPct;
+      if (aoa <= stall) {
+        return clamp(normalCl, 0.04, stallCl);
+      }
+      const excess = aoa - stall;
+      const stalledCl = stallCl * postStallLiftRatio(excess);
+      return stalledCl;
+    }
+
+    function setLine(line, x1, y1, x2, y2) {
+      line.setAttribute("x1", x1.toFixed(1));
+      line.setAttribute("y1", y1.toFixed(1));
+      line.setAttribute("x2", x2.toFixed(1));
+      line.setAttribute("y2", y2.toFixed(1));
+    }
+
+    function setArrowHead(head, start, end, size, color) {
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      const px = -uy;
+      const py = ux;
+      const baseX = end.x - ux * size;
+      const baseY = end.y - uy * size;
+      const halfWidth = size * 0.42;
+      const points = [
+        `${end.x.toFixed(1)},${end.y.toFixed(1)}`,
+        `${(baseX + px * halfWidth).toFixed(1)},${(baseY + py * halfWidth).toFixed(1)}`,
+        `${(baseX - px * halfWidth).toFixed(1)},${(baseY - py * halfWidth).toFixed(1)}`
+      ].join(" ");
+      head.setAttribute("points", points);
+      head.setAttribute("fill", color);
+    }
+
+    function setForceVector(line, head, start, end, size, color) {
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      const stemEnd = {
+        x: end.x - ux * size * 0.78,
+        y: end.y - uy * size * 0.78
+      };
+      setLine(line, start.x, start.y, stemEnd.x, stemEnd.y);
+      line.setAttribute("stroke", color);
+      setArrowHead(head, start, end, size, color);
+    }
+
+    function setText(el, x, y, text, anchor = "middle") {
+      el.setAttribute("x", x.toFixed(1));
+      el.setAttribute("y", y.toFixed(1));
+      el.setAttribute("text-anchor", anchor);
+      if (text !== undefined) el.textContent = text;
+    }
+
+    function setCircle(el, x, y) {
+      el.setAttribute("cx", x.toFixed(1));
+      el.setAttribute("cy", y.toFixed(1));
+    }
+
+    function updateOutputs(values) {
+      els.pitchOut.textContent = `${values.pitch.toFixed(1)} deg`;
+      els.speedOut.textContent = `${values.airspeed.toFixed(0)} kt`;
+      els.cgOut.textContent = `${values.cg.toFixed(1)}% MAC`;
+      els.cpOut.textContent = `${values.cp.toFixed(1)}% MAC`;
+      els.camberOut.textContent = `${values.camber.toFixed(1)}%`;
+      els.tailOut.textContent = `${fmt.format(values.tail)} lb`;
+    }
+
+    function setStatus(aoa, stallRatio, stallAoa) {
+      els.statusChip.classList.remove("caution", "stall");
+      if (aoa > stallAoa) {
+        els.statusChip.textContent = "Stall / separated flow";
+        els.statusChip.classList.add("stall");
+      } else if (stallRatio > 0.78) {
+        els.statusChip.textContent = "Approaching stall";
+        els.statusChip.classList.add("caution");
+      } else {
+        els.statusChip.textContent = "Normal flight";
+      }
+    }
+
+    function setStabilityBox(box, state) {
+      box.setAttribute("class", `stability-box ${state}`);
+    }
+
+    function updateCgStability(cg, tail) {
+      let state = "neutral";
+      let title = "Mid CG";
+      let text = "Balanced elevator feel, cruise drag, and stall recovery.";
+
+      if (cg < 24) {
+        state = "positive";
+        title = "Forward CG";
+        text = "More stable, heavier elevator, more tail download, higher stall speed and drag.";
+      } else if (cg < 29) {
+        state = "positive";
+        title = "Slightly Forward CG";
+        text = "Stable feel with extra tail download; recovery is strong but lift demand rises.";
+      } else if (cg <= 34) {
+        state = "neutral";
+        title = "Mid CG";
+        text = "Balanced stability and control response for this trainer setup.";
+      } else {
+        state = "negative";
+        title = "Aft CG";
+        text = "Lower tail load and lighter elevator, but reduced stability and weaker stall recovery.";
+      }
+
+      if (tail > 720 && cg < 30) {
+        text = "Very stable but tail download is high; the wing must carry more load.";
+      }
+
+      setStabilityBox(els.cgStabilityBox, state);
+      els.cgStabilityTitle.textContent = title;
+      els.cgStabilityText.textContent = text;
+    }
+
+    function classifyLongitudinalStability(cg, thresholdCp, tail, isStalled) {
+      const staticMargin = thresholdCp - cg;
+      let staticKind = "neutral";
+      if (staticMargin > 3) staticKind = "positive";
+      if (staticMargin < -2) staticKind = "negative";
+
+      let dynamicScore = staticMargin / 8 + clamp((31 - cg) / 14, -0.7, 0.8) - clamp((tail - 650) / 380, 0, 0.55);
+      let dynamicKind = "neutral";
+      if (dynamicScore > 0.38) dynamicKind = "positive";
+      if (dynamicScore < -0.22) dynamicKind = "negative";
+      if (isStalled) dynamicKind = "negative";
+
+      const boxState = staticKind === "negative" || dynamicKind === "negative"
+        ? "negative"
+        : staticKind === "neutral" || dynamicKind === "neutral"
+          ? "neutral"
+          : "positive";
+
+      const cap = value => value.charAt(0).toUpperCase() + value.slice(1);
+      const title = `${cap(staticKind)} Static / ${cap(dynamicKind)} Dynamic`;
+      const relation = Math.abs(staticMargin) < 1
+        ? "CP is almost lined up with CG"
+        : staticMargin > 0
+          ? `CP is ${staticMargin.toFixed(1)}% MAC behind CG`
+          : `CP is ${Math.abs(staticMargin).toFixed(1)}% MAC ahead of CG`;
+      const scenarioText = stabilityScenarioText(staticKind, dynamicKind);
+      return { staticKind, dynamicKind, boxState, title, text: `${relation}. ${scenarioText}`, dynamicScore };
+    }
+
+    function stabilityScenarioText(staticKind, dynamicKind) {
+      const scenarios = {
+        "positive-positive": "Nose starts back toward trim; each pitch swing gets smaller.",
+        "positive-neutral": "Nose starts back toward trim; the swings keep the same size.",
+        "positive-negative": "Nose starts back toward trim, but each swing gets larger.",
+        "neutral-positive": "Nose does not return right away; the pitch change slowly fades.",
+        "neutral-neutral": "Nose stays where it was pushed.",
+        "neutral-negative": "Nose stays pushed at first, then the pitch change grows.",
+        "negative-positive": "Nose first goes the wrong way, then the motion settles down.",
+        "negative-neutral": "Nose first goes the wrong way, then keeps about the same error.",
+        "negative-negative": "Nose goes the wrong way and the pitch gets worse."
+      };
+      return scenarios[`${staticKind}-${dynamicKind}`];
+    }
+
+    function updateLongitudinalStability(cg, thresholdCp, tail, isStalled) {
+      const stability = classifyLongitudinalStability(cg, thresholdCp, tail, isStalled);
+      setStabilityBox(els.longitudinalStabilityBox, stability.boxState);
+      els.longitudinalStabilityTitle.textContent = stability.title;
+      els.longitudinalStabilityText.textContent = stability.text;
+    }
+
+    function currentStabilitySnapshot() {
+      const pitch = Number(els.pitch.value);
+      const cg = Number(els.cg.value);
+      const camber = Number(els.camber.value);
+      const tail = Number(els.tail.value);
+      const thresholdCp = els.autoCp.checked
+        ? attachedCenterOfPressure(pitch, camber)
+        : Number(els.cp.value);
+      const effectiveTail = tailAerodynamics(tail, pitch).downforce;
+      const effectiveStall = effectiveStallAoA(cg, thresholdCp, effectiveTail);
+      return classifyLongitudinalStability(cg, thresholdCp, effectiveTail, pitch > effectiveStall);
+    }
+
+    function updateDisturbanceControls(progress = 0, direction = 0, label = "Ready") {
+      const pct = `${(clamp(progress, 0, 1) * 100).toFixed(0)}%`;
+      els.disturbanceProgress.style.width = pct;
+      els.disturbanceOut.textContent = label;
+      els.pitchUpDemoBtn.classList.toggle("running", direction > 0);
+      els.pitchDownDemoBtn.classList.toggle("running", direction < 0);
+      els.pitchUpDemoBtn.setAttribute("aria-pressed", direction > 0 ? "true" : "false");
+      els.pitchDownDemoBtn.setAttribute("aria-pressed", direction < 0 ? "true" : "false");
+    }
+
+    function updateDemoDurationLabel() {
+      els.demoDurationOut.textContent = `${Math.round(model.demoDurationMs / 1000)} sec`;
+    }
+
+    function setDemoDuration(deltaSeconds) {
+      model.demoDurationMs = clamp(model.demoDurationMs + deltaSeconds * 1000, 4000, 20000);
+      if (model.disturbance) {
+        model.disturbance.durationMs = model.demoDurationMs;
+      }
+      updateDemoDurationLabel();
+    }
+
+    function stopControlTransition() {
+      model.transition = null;
+    }
+
+    function startControlTransition(targets, durationMs = 1500) {
+      stopDisturbancePlayback("Ready", 0);
+      model.transition = {
+        startedAt: performance.now(),
+        durationMs,
+        from: {
+          pitch: Number(els.pitch.value),
+          airspeed: Number(els.airspeed.value),
+          tail: Number(els.tail.value)
+        },
+        to: targets
+      };
+      model.pitchRate = 0;
+    }
+
+    function applyControlTransition(now) {
+      const transition = model.transition;
+      if (!transition) return;
+
+      const progress = clamp((now - transition.startedAt) / transition.durationMs, 0, 1);
+      const eased = smoothstep(0, 1, progress);
+      const nextPitch = lerp(transition.from.pitch, transition.to.pitch, eased);
+      const nextAirspeed = lerp(transition.from.airspeed, transition.to.airspeed, eased);
+      const nextTail = lerp(transition.from.tail, transition.to.tail, eased);
+
+      els.pitch.value = nextPitch;
+      els.airspeed.value = nextAirspeed;
+      els.tail.value = nextTail;
+      model.lastPitchForTail = nextPitch;
+      model.lastTailForPitch = nextTail;
+
+      if (progress >= 1) {
+        els.pitch.value = transition.to.pitch;
+        els.airspeed.value = transition.to.airspeed;
+        els.tail.value = transition.to.tail;
+        model.lastPitchForTail = transition.to.pitch;
+        model.lastTailForPitch = transition.to.tail;
+        stopControlTransition();
+      }
+    }
+
+    function stallOnsetTargets() {
+      const startPitch = Number(els.pitch.value);
+      const startTail = Number(els.tail.value);
+      const cg = Number(els.cg.value);
+      const camber = Number(els.camber.value);
+      let targetPitch = Math.max(startPitch, model.stallAoA - 2);
+      let targetTail = startTail;
+
+      for (let i = 0; i < 8; i += 1) {
+        const thresholdCp = attachedCenterOfPressure(targetPitch, camber);
+        const effectiveTail = tailAerodynamics(targetTail, targetPitch).downforce;
+        const effectiveStall = effectiveStallAoA(cg, thresholdCp, effectiveTail);
+        targetPitch = clamp(effectiveStall + 0.55, -90, 90);
+        targetTail = clamp(startTail + (targetPitch - startPitch) * tailPerPitchDegree, 0, 900);
+      }
+
+      return {
+        pitch: targetPitch,
+        airspeed: Math.max(Number(els.airspeed.value), 82),
+        tail: targetTail
+      };
+    }
+
+    function stopDisturbancePlayback(label = "Ready", progress = 0) {
+      model.disturbance = null;
+      updateDisturbanceControls(progress, 0, label);
+    }
+
+    function startDisturbancePlayback(direction) {
+      stopControlTransition();
+      const stability = currentStabilitySnapshot();
+      const pitch = Number(els.pitch.value);
+      const tail = Number(els.tail.value);
+      model.disturbance = {
+        startedAt: performance.now(),
+        durationMs: model.demoDurationMs,
+        returnMs: 1600,
+        direction,
+        basePitch: pitch,
+        baseTail: tail,
+        staticKind: stability.staticKind,
+        dynamicKind: stability.dynamicKind
+      };
+      model.pitchRate = 0;
+      model.lastPitchForTail = pitch;
+      model.lastTailForPitch = tail;
+      updateDisturbanceControls(0, direction, "Play");
+    }
+
+    function disturbancePitchOffset(staticKind, dynamicKind, progress, direction) {
+      const attack = smoothstep(0, 0.055, progress);
+      const cycle = 2 * Math.PI * 0.85 * progress;
+      let offset = 0;
+
+      if (staticKind === "positive") {
+        if (dynamicKind === "positive") {
+          offset = 82 * Math.exp(-3.2 * progress) * Math.cos(cycle);
+        } else if (dynamicKind === "neutral") {
+          offset = 42 * Math.cos(cycle);
+        } else {
+          const amp = lerp(24, 92, Math.pow(progress, 1.18));
+          offset = amp * Math.cos(cycle);
+        }
+      } else if (staticKind === "neutral") {
+        if (dynamicKind === "positive") {
+          offset = 52 * Math.exp(-2.7 * progress);
+        } else if (dynamicKind === "neutral") {
+          offset = 42;
+        } else {
+          offset = 22 + 65 * Math.pow(progress, 1.5) + Math.sin(cycle * 0.55) * 4;
+        }
+      } else {
+        if (dynamicKind === "positive") {
+          offset = 58 * Math.exp(-2.4 * progress) + Math.sin(cycle * 0.75) * 8 * Math.exp(-2 * progress);
+        } else if (dynamicKind === "neutral") {
+          offset = 34 + 34 * smoothstep(0.08, 1, progress) + Math.sin(cycle * 0.45) * 4;
+        } else {
+          offset = 24 + 74 * Math.pow(progress, 1.55) + Math.sin(cycle * 0.55) * 8 * progress;
+        }
+      }
+
+      return direction * offset * attack;
+    }
+
+    function applyDisturbancePlayback(now, dt) {
+      const demo = model.disturbance;
+      if (!demo) return;
+
+      const elapsed = now - demo.startedAt;
+      const currentPitch = Number(els.pitch.value);
+      const currentTail = Number(els.tail.value);
+      let targetPitch = currentPitch;
+      let targetTail = currentTail;
+      let label = "Play";
+      let controlDirection = demo.direction;
+      let progress = clamp(elapsed / demo.durationMs, 0, 1);
+      let maxRate = demo.dynamicKind === "negative"
+        ? lerp(70, 180, progress)
+        : demo.staticKind === "negative"
+          ? 130
+          : 110;
+
+      if (elapsed <= demo.durationMs) {
+        const offset = disturbancePitchOffset(demo.staticKind, demo.dynamicKind, progress, demo.direction);
+        targetPitch = clamp(demo.basePitch + offset, -90, 90);
+        targetTail = clamp(demo.baseTail + (targetPitch - demo.basePitch) * tailPerPitchDegree, 0, 900);
+        const secondsLeft = Math.max(0, Math.ceil((demo.durationMs - elapsed) / 1000));
+        label = `${secondsLeft}s`;
+      } else {
+        if (!demo.returning) {
+          demo.returning = true;
+          demo.returnStartedAt = now;
+          demo.returnFromPitch = currentPitch;
+          demo.returnFromTail = currentTail;
+        }
+        const returnProgress = clamp((now - demo.returnStartedAt) / demo.returnMs, 0, 1);
+        const easedReturn = smoothstep(0, 1, returnProgress);
+        targetPitch = lerp(demo.returnFromPitch, demo.basePitch, easedReturn);
+        targetTail = lerp(demo.returnFromTail, demo.baseTail, easedReturn);
+        progress = 1;
+        maxRate = 180;
+        controlDirection = 0;
+        label = returnProgress >= 1 ? "Ready" : "Leveling";
+      }
+
+      const maxStep = maxRate * Math.max(dt, 1 / 60);
+      const nextPitch = currentPitch + clamp(targetPitch - currentPitch, -maxStep, maxStep);
+      const nextTail = clamp(
+        currentTail + clamp(targetTail - currentTail, -maxStep * tailPerPitchDegree, maxStep * tailPerPitchDegree),
+        0,
+        900
+      );
+
+      els.pitch.value = nextPitch;
+      els.tail.value = nextTail;
+      model.pitchRate = clamp((nextPitch - currentPitch) / Math.max(dt, 1 / 60), -28, 28);
+      model.lastPitchForTail = nextPitch;
+      model.lastTailForPitch = nextTail;
+      updateDisturbanceControls(progress, controlDirection, label);
+
+      if (demo.returning && now - demo.returnStartedAt >= demo.returnMs) {
+        els.pitch.value = demo.basePitch;
+        els.tail.value = demo.baseTail;
+        model.pitchRate = 0;
+        model.lastPitchForTail = demo.basePitch;
+        model.lastTailForPitch = demo.baseTail;
+        stopDisturbancePlayback("Ready", 0);
+      }
+    }
+
+    function applyTailPitchChange() {
+      const tail = Number(els.tail.value);
+      const deltaTail = tail - model.lastTailForPitch;
+      if (Math.abs(deltaTail) < 0.01) return;
+
+      const pitch = Number(els.pitch.value);
+      const nextPitch = clamp(pitch + deltaTail / tailPerPitchDegree, -90, 90);
+      els.pitch.value = nextPitch;
+      model.pitchRate = clamp(model.pitchRate + deltaTail / 70, -8, 8);
+      model.lastTailForPitch = tail;
+      model.lastPitchForTail = nextPitch;
+    }
+
+    function applyPitchTailChange() {
+      const pitch = Number(els.pitch.value);
+      const deltaPitch = pitch - model.lastPitchForTail;
+      if (Math.abs(deltaPitch) < 0.01) return;
+
+      const nextTail = clamp(Number(els.tail.value) + deltaPitch * tailPerPitchDegree, 0, 900);
+      els.tail.value = nextTail;
+      model.lastTailForPitch = nextTail;
+      model.lastPitchForTail = pitch;
+    }
+
+    function estimateLiftForTrim(pitch, airspeed, camber, effectiveStall) {
+      const cl = liftCoefficient(pitch, camber, effectiveStall);
+      const qScale = Math.pow(airspeed / 82, 2);
+      const rawLiftLb = cl * model.weightLb * qScale;
+      const stallExcess = Math.max(0, pitch - effectiveStall);
+      const stallLiftCap = pitch > effectiveStall
+        ? model.weightLb * postStallLiftRatio(stallExcess)
+        : Infinity;
+      return Math.min(rawLiftLb, stallLiftCap);
+    }
+
+    function applyCgTrimChange() {
+      const cg = Number(els.cg.value);
+      const previousCg = model.lastCgForTrim;
+      const deltaCg = cg - previousCg;
+      if (Math.abs(deltaCg) < 0.01) return;
+
+      const pitch = Number(els.pitch.value);
+      const airspeed = Number(els.airspeed.value);
+      const camber = Number(els.camber.value);
+      const currentTail = Number(els.tail.value);
+      const cpForTrim = els.autoCp.checked
+        ? attachedCenterOfPressure(pitch, camber)
+        : Number(els.cp.value);
+      const effectiveStall = effectiveStallAoA(previousCg, cpForTrim, tailAerodynamics(currentTail, pitch).downforce);
+      const liftForTrim = estimateLiftForTrim(pitch, airspeed, camber, effectiveStall);
+      const xCpLocal = pctToX(cpForTrim);
+      const requiredTailForCg = cgPct => {
+        const xCgLocal = pctToX(cgPct);
+        const tailArm = Math.max(0.25, (model.tail.x - xCgLocal) / model.chord);
+        const wingMomentToBalance = ((xCpLocal - xCgLocal) / model.chord) * liftForTrim;
+        return wingMomentToBalance / tailArm;
+      };
+      const previousRequiredTail = requiredTailForCg(previousCg);
+      const newRequiredTail = requiredTailForCg(cg);
+      const requiredTail = clamp(currentTail + newRequiredTail - previousRequiredTail, 0, 900);
+
+      els.tail.value = requiredTail;
+      model.lastTailForPitch = requiredTail;
+      model.lastPitchForTail = pitch;
+      model.lastCgForTrim = cg;
+    }
+
+    function update(now = performance.now()) {
+      const dt = clamp((now - model.lastTime) / 1000, 0, 0.04);
+      model.lastTime = now;
+
+      applyControlTransition(now);
+
+      let pitch = Number(els.pitch.value);
+      const airspeed = Number(els.airspeed.value);
+      const cg = Number(els.cg.value);
+      const camber = Number(els.camber.value);
+      let tail = Number(els.tail.value);
+      const timeSec = now / 1000;
+
+      if (model.disturbance) {
+        applyDisturbancePlayback(now, dt);
+        pitch = Number(els.pitch.value);
+        tail = Number(els.tail.value);
+      } else {
+        model.pitchRate *= 0.75;
+      }
+
+      const paths = airfoilPaths(camber);
+      els.wingPath.setAttribute("d", paths.wing);
+      els.camberLine.setAttribute("d", paths.camber);
+      els.cpTrack.setAttribute("d", paths.track);
+
+      const thresholdCp = els.autoCp.checked
+        ? attachedCenterOfPressure(pitch, camber)
+        : Number(els.cp.value);
+      const tailAero = tailAerodynamics(tail, pitch);
+      const effectiveTail = tailAero.downforce;
+      const effectiveStall = effectiveStallAoA(cg, thresholdCp, effectiveTail);
+      const cp = els.autoCp.checked
+        ? autoCenterOfPressure(pitch, camber, timeSec, effectiveStall)
+        : Number(els.cp.value);
+
+      if (els.autoCp.checked) {
+        els.cp.value = cp;
+      }
+      els.cp.disabled = els.autoCp.checked;
+
+      const cl = liftCoefficient(pitch, camber, effectiveStall);
+      const qScale = Math.pow(airspeed / 82, 2);
+      const rawLiftLb = cl * model.weightLb * qScale;
+      const stallExcess = Math.max(0, pitch - effectiveStall);
+      const stallLiftCap = pitch > effectiveStall
+        ? model.weightLb * postStallLiftRatio(stallExcess)
+        : Infinity;
+      const liftLb = Math.min(rawLiftLb, stallLiftCap);
+      const xCgLocal = pctToX(cg);
+      const xCpLocal = pctToX(cp);
+      const tCp = cp / 100;
+      const cgLocal = { x: xCgLocal, y: model.wingY - 18 };
+      const cpLocal = { x: xCpLocal, y: camberAt(tCp, camber) - 6 };
+      const cgWorld = rotatePoint(cgLocal, pitch);
+      const cpWorld = rotatePoint(cpLocal, pitch);
+      const tailWorld = rotatePoint(model.tail, pitch);
+
+      const stallRatio = clamp((pitch + 4) / (effectiveStall + 4), 0, 1);
+      const isStalled = pitch > effectiveStall;
+      setStatus(pitch, stallRatio, effectiveStall);
+      updateCgStability(cg, effectiveTail);
+      updateLongitudinalStability(cg, thresholdCp, effectiveTail, isStalled);
+      updateOutputs({ pitch, airspeed, cg, cp, camber, tail });
+
+      els.plane.setAttribute("transform", `rotate(${pitch.toFixed(2)} 500 318)`);
+
+      setCircle(els.cgDot, cgWorld.x, cgWorld.y);
+      setLine(els.cgCross1, cgWorld.x - 15, cgWorld.y, cgWorld.x + 15, cgWorld.y);
+      setLine(els.cgCross2, cgWorld.x, cgWorld.y - 15, cgWorld.x, cgWorld.y + 15);
+      setText(els.cgLabel, cgWorld.x, cgWorld.y - 23, "CG");
+
+      setCircle(els.cpDot, cpWorld.x, cpWorld.y);
+      els.cpDot.setAttribute("stroke", isStalled ? "#c53030" : "#1769aa");
+      els.cpDot.setAttribute("fill", isStalled ? "#fff0f0" : "#e7f4ff");
+      setText(els.cpLabel, cpWorld.x, cpWorld.y + 33, "CP");
+
+      const liftLen = clamp(48 + (liftLb / 26), 48, 188);
+      const liftTiltDeg = isStalled
+        ? clamp(14 + (pitch - effectiveStall) * 2.2, 14, 32)
+        : clamp((pitch - 4) * 0.45, -4, 7);
+      const liftEnd = {
+        x: cpWorld.x + Math.sin(liftTiltDeg * Math.PI / 180) * liftLen,
+        y: cpWorld.y - Math.cos(liftTiltDeg * Math.PI / 180) * liftLen
+      };
+      const liftColor = isStalled ? "#c53030" : "#1769aa";
+      const liftHeadSize = clamp(13 + liftLb / 155, 14, 34);
+      setForceVector(els.liftVector, els.liftArrowHead, cpWorld, liftEnd, liftHeadSize, liftColor);
+      els.liftVector.setAttribute("stroke-dasharray", isStalled ? "10 8" : "");
+      setText(els.liftLabel, liftEnd.x, liftEnd.y - 12, isStalled ? "Weak lift" : "Lift");
+      const buffetAmount = isStalled ? clamp(stallExcess / 9, 0, 1) : 0;
+      setText(els.buffetLabel, liftEnd.x, liftEnd.y - 31, "* buffeting");
+      els.buffetLabel.setAttribute("opacity", buffetAmount > 0.02 ? (0.55 + buffetAmount * 0.45).toFixed(2) : "0");
+
+      const tailDownLen = clamp(30 + effectiveTail / 8, 30, 145);
+      const tailDragLen = clamp(8 + tailAero.dragEquivalent / 8 + Math.max(0, pitch) * 0.12, 8, 115);
+      const tailEnd = {
+        x: tailWorld.x + tailDragLen,
+        y: tailWorld.y + tailDownLen
+      };
+      const tailVectorLen = Math.hypot(tailDragLen, tailDownLen);
+      setForceVector(els.tailVector, els.tailArrowHead, tailWorld, tailEnd, clamp(10 + tailVectorLen / 6, 12, 31), "#6554c0");
+      setText(els.tailLabel, tailEnd.x + 8, tailEnd.y + 22, tailAero.stallT > 0.18 ? "Tail limit / drag" : "Tail downforce", "start");
+      setText(els.tailLimitLabel, tailEnd.x + 8, tailEnd.y + 40, "* stabilator stalled", "start");
+      els.tailLimitLabel.setAttribute("opacity", tailAero.stallT > 0.08 ? (0.45 + tailAero.stallT * 0.55).toFixed(2) : "0");
+
+      const weightLen = 110;
+      const weightEnd = { x: cgWorld.x, y: cgWorld.y + weightLen };
+      setForceVector(els.weightVector, els.weightArrowHead, cgWorld, weightEnd, clamp(12 + model.weightLb / 150, 18, 30), "#323846");
+      setText(els.weightLabel, cgWorld.x + 70, cgWorld.y + weightLen - 5, "Weight", "start");
+
+      const rulerXForPct = pct => 12 + (pct / 100) * 236;
+      const cgX = rulerXForPct(cg);
+      const cpX = rulerXForPct(cp);
+      els.cgTick.setAttribute("x1", cgX.toFixed(1));
+      els.cgTick.setAttribute("x2", cgX.toFixed(1));
+      els.cpTick.setAttribute("x1", cpX.toFixed(1));
+      els.cpTick.setAttribute("x2", cpX.toFixed(1));
+      setText(els.rulerCg, cgX, -25, "CG");
+      setText(els.rulerCp, cpX, -40, "CP");
+
+      const liftRatio = liftLb / model.weightLb;
+
+      els.attitudeMetric.textContent = `${pitch.toFixed(1)} deg`;
+      els.balanceMetric.textContent = `${fmt.format(model.weightLb)} / ${fmt.format(liftLb)} lb`;
+      els.cpTravelMetric.textContent = isStalled
+        ? `Stalled at ${effectiveStall.toFixed(1)} deg: lift = ${liftRatio.toFixed(2)}x`
+        : `Stall near ${effectiveStall.toFixed(1)} deg: lift = ${liftRatio.toFixed(2)}x`;
+
+      requestAnimationFrame(update);
+    }
+
+    function reset() {
+      els.pitch.value = defaults.pitch;
+      els.airspeed.value = defaults.airspeed;
+      els.cg.value = defaults.cg;
+      els.cp.value = defaults.cp;
+      els.camber.value = defaults.camber;
+      els.tail.value = defaults.tail;
+      els.autoCp.checked = true;
+      model.pitchRate = 0;
+      model.lastTailForPitch = defaults.tail;
+      model.lastPitchForTail = defaults.pitch;
+      model.lastCgForTrim = defaults.cg;
+      stopControlTransition();
+      stopDisturbancePlayback("Ready", 0);
+    }
+
+    els.resetBtn.addEventListener("click", reset);
+    els.stallBtn.addEventListener("click", () => {
+      els.autoCp.checked = true;
+      startControlTransition(stallOnsetTargets(), 1500);
+      model.lastCgForTrim = Number(els.cg.value);
+    });
+
+    els.demoDurationMinus.addEventListener("click", () => setDemoDuration(-1));
+    els.demoDurationPlus.addEventListener("click", () => setDemoDuration(1));
+    els.pitchUpDemoBtn.addEventListener("click", () => startDisturbancePlayback(1));
+    els.pitchDownDemoBtn.addEventListener("click", () => startDisturbancePlayback(-1));
+
+    [els.pitch, els.airspeed, els.cg, els.cp, els.camber, els.tail].forEach(input => {
+      input.addEventListener("input", () => {
+        stopControlTransition();
+        if (model.disturbance) stopDisturbancePlayback("Ready", 0);
+        if (input === els.pitch) {
+          model.pitchRate = 0;
+          applyPitchTailChange();
+        }
+        if (input === els.cg) applyCgTrimChange();
+        if (input === els.tail) applyTailPitchChange();
+      });
+    });
+
+    updateDemoDurationLabel();
+    update();
+  </script>
+</body>
+</html>
